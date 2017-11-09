@@ -9,6 +9,7 @@
 #include <vector>
 #include <iostream>
 #include <cmath>
+#include <chrono>
 
 
 
@@ -41,7 +42,7 @@ int main() {
 	int circleCount = 0;
 	Vec3f eyeball;
 
-	Mat frame, gray_face, leftEye;//, eye;
+	Mat frame, gray_face, leftEye, compute_frame, eye_edge, detected_eye_edge;
 
 	Rect eyeRect;
 
@@ -54,8 +55,8 @@ int main() {
 	cv::VideoCapture camera(CameraIndex); // Try opening camera
 
 #if SCALE_DOWN_VIDEO
-	camera.set(CV_CAP_PROP_FRAME_WIDTH, 320);
-	camera.set(CV_CAP_PROP_FRAME_HEIGHT, 240);
+	camera.set(CV_CAP_PROP_compute_frame_WIDTH, 320);
+	camera.set(CV_CAP_PROP_compute_frame_HEIGHT, 240);
 #endif
 
 	camera.set(CAP_PROP_FPS, 60);
@@ -65,62 +66,73 @@ int main() {
 		exit(1);
 	}
 
-	while (true)
-	{
+	while (true) {
 		camera.read(frame);
-		cv::flip(frame, frame, 1); //flip the frame horizontally
-
-		if (waitKey(30) == 27)
-		{
+		camera.read(compute_frame);
+		cv::flip(frame, frame, 1); //flip the compute_frame horizontally
+		//	secondary_compute_frame = frame;
+		if (waitKey(25) == 27) {
 			return 0;
 		}
-		cvtColor(frame, gray_face, COLOR_BGR2GRAY, 0);
+		cvtColor(compute_frame, gray_face, COLOR_BGR2GRAY, 0);
 		equalizeHist(gray_face, gray_face);
-		face_cascade.detectMultiScale(gray_face, faceVect, scale_factor, min_Neighbors, flags, Size(100, 100));//, Size(250, 250)); //, 1.05, 3, 0|CV_HAAR_FIND_BIGGEST_OBJECT, Size(20, 30), cv::Size(80, 80));
+		face_cascade.detectMultiScale(gray_face, faceVect, scale_factor,
+				min_Neighbors, flags, Size(100, 100));//, Size(250, 250)); //, 1.05, 3, 0|CV_HAAR_FIND_BIGGEST_OBJECT, Size(20, 30), cv::Size(80, 80));
 		Mat face_roi = gray_face(faceVect[0]);
 		//for (uint64_t i = 0; i < faceVect.size(); i++) //detecting the face
 		//{
-			rectangle(frame, faceVect[0], GREEN_REC, 1, 8, 0);
-			eye_cascade.detectMultiScale(face_roi, eyeVect, scale_factor, min_Neighbors, flags, Size(30, 30), Size(70, 70));
-			for(uint64_t j = 0; j < eyeVect.size(); j++) //detecting the eyes
-			{
-
-				//Point center( faceVect[i].x + eyeVect[j].x + eyeVect[j].width*0.5, faceVect[i].y + eyeVect[j].y + eyeVect[j].height*0.5 );
-				//int radius = cvRound( (eyeVect[j].width + eyeVect[j].height)*0.25 );
-				//circle( frame, center, radius, Scalar( 255, 0, 0 ), 1, 8, 0 );
-				if(eyeVect.size() != 2)
+		rectangle(compute_frame, faceVect[0], GREEN_REC, 1, 8, 0);
+		eye_cascade.detectMultiScale(face_roi, eyeVect, scale_factor,
+				min_Neighbors, flags, Size(30, 30), Size(70, 70));
+		for (uint64_t j = 0; j < eyeVect.size(); j++) //detecting the eyes
 				{
-					//printf("both eyes not found\n");
-					break; //if both eyes are not found, return out.
-				}
-				rectangle(frame, faceVect[0].tl() + eyeVect[j].tl(), faceVect[0].tl() + eyeVect[j].br(), WHITE_REC, 2);
-				//rectangle(frame, cvPoint(eyeVect[j].x, eyeVect[j].y), cvPoint(+ eyeVect[j].width + eyeVect[j].x
-				//		,eyeVect[j].height + eyeVect[j].y), Scalar(0, 0, 255), 1, 8, 0);
 
-				//printf("BEFORE call to getLeftmostEye\n");
-				eyeRect = getLeftmostEye(eyeVect);
-				Mat eye = face_roi(eyeRect);
-				equalizeHist(eye, eye);
-#if DETECT_IRIS
-				HoughCircles(eye, circles, CV_HOUGH_GRADIENT, 1, eye.cols / 8, 250, 15, eye.rows / 6, eye.rows / 4);
-				//rectangle(frame, faceVect[0] + eyeVect[j].tl(), Scalar(255, 0, 0), 1, 8, 0);
-				if(circles.size() > 0)
-				{
-					printf("Circles > %i\n", circleCount);
-					eyeball = getEyeBallfromROI(eye, circles);
-					Point center(eyeball[0], eyeball[1]);
-					centers.push_back(center);
-					center = stabalize(centers, 5);
-					int radius = (int)eyeball[2];
-					circle(frame, faceVect[0].tl() + eyeRect.tl() + center, radius, RED_IRIS, 1);
-					//circle(eye, center, radius, Scalar(0, 0, 255), 2);
-					circleCount++;
-
-				}
-#endif
+			//Point center( faceVect[i].x + eyeVect[j].x + eyeVect[j].width*0.5, faceVect[i].y + eyeVect[j].y + eyeVect[j].height*0.5 );
+			//int radius = cvRound( (eyeVect[j].width + eyeVect[j].height)*0.25 );
+			//circle( compute_frame, center, radius, Scalar( 255, 0, 0 ), 1, 8, 0 );
+			if (eyeVect.size() != 2) {
+				printf("both eyes not found\n");
+				//break; //if both eyes are not found, return out.
 			}
+			rectangle(compute_frame, faceVect[0].tl() + eyeVect[j].tl(),
+					faceVect[0].tl() + eyeVect[j].br(), WHITE_REC, 2);
+			//rectangle(compute_frame, cvPoint(eyeVect[j].x, eyeVect[j].y), cvPoint(+ eyeVect[j].width + eyeVect[j].x
+			//		,eyeVect[j].height + eyeVect[j].y), Scalar(0, 0, 255), 1, 8, 0);
+
+			//printf("BEFORE call to getLeftmostEye\n");
+
+			eyeRect = getLeftmostEye(eyeVect);
+			Mat eye = face_roi(eyeRect);
+			Mat eye_edge = face_roi(eyeRect);
+			Mat eye_edge_output = eye;
+			equalizeHist(eye, eye);
+			//equalizeHist(eye_edge, eye_edge);
+			blur(eye_edge, eye_edge_output, Size(3, 3));
+			Canny(eye_edge_output, detected_eye_edge, 30, 50, 3, true);
+
+#if DETECT_IRIS
+			HoughCircles(eye, circles, CV_HOUGH_GRADIENT, 1, eye.cols / 8, 250,
+					15, eye.rows / 6, eye.rows / 4);
+			//rectangle(compute_frame, faceVect[0] + eyeVect[j].tl(), Scalar(255, 0, 0), 1, 8, 0);
+			if (circles.size() > 0) {
+				//	printf("Circles > %i\n", circleCount);
+				eyeball = getEyeBallfromROI(eye, circles);
+				Point center(eyeball[0], eyeball[1]);
+				centers.push_back(center);
+				center = stabalize(centers, 5);
+				int radius = (int) eyeball[2];
+				circle(compute_frame, faceVect[0].tl() + eyeRect.tl() + center,
+						radius, RED_IRIS, 1);
+				//circle(eye, center, radius, Scalar(0, 0, 255), 2);
+				//circleCount++;
+
+			}
+#endif
+		}
+
 		//}
-		imshow("Distracted Driver Detection", frame);
+		imshow("Distracted Driver Detection", compute_frame);
+		imshow("Secondary Display", detected_eye_edge);
 	}
 	return 0;
 }
